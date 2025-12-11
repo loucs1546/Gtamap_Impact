@@ -21,14 +21,14 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding-top: 2rem;
+      padding-top: 1.5rem;
       touch-action: none;
     }
 
     h1 {
-      font-size: 5rem;
+      font-size: 4.6rem;
       font-weight: 900;
-      letter-spacing: 4px;
+      letter-spacing: 3px;
       text-transform: uppercase;
       background: linear-gradient(45deg, #8a8a8a, #ffffff, #8a8a8a);
       -webkit-background-clip: text;
@@ -36,8 +36,8 @@
       color: transparent;
       background-size: 300% 300%;
       animation: shine 6s infinite linear;
-      margin-bottom: 0.5rem;
-      text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+      margin-bottom: 0.4rem;
+      text-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
     }
 
     @keyframes shine {
@@ -47,16 +47,47 @@
     }
 
     h2 {
-      font-size: 1.5rem;
+      font-size: 1.4rem;
       font-weight: 300;
-      letter-spacing: 8px;
+      letter-spacing: 6px;
       color: #aaa;
-      margin-bottom: 2rem;
+      margin-bottom: 1.2rem;
     }
+
+    /* Légende */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 1.4rem;
+      max-width: 90vw;
+      font-size: 0.95rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .red { background: #ff4d4d; }
+    .green { background: #4dff4d; }
+    .yellow { background: #ffd700; }
+    .purple { background: #d8b4ff; }
+    .blue { background: #4da6ff; }
+    .white { background: #ffffff; }
 
     .image-container {
       width: 90vw;
-      height: 70vh;
+      height: 65vh; /* un peu plus compact pour la légende */
       overflow: hidden;
       border-radius: 8px;
       box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
@@ -73,7 +104,7 @@
       max-width: none;
       max-height: none;
       cursor: grab;
-      transition: transform 0.1s ease-out;
+      transition: transform 0.12s ease-out;
       -webkit-user-drag: none;
       -webkit-touch-callout: none;
       user-select: none;
@@ -85,28 +116,28 @@
 
     .zoom-controls {
       position: absolute;
-      top: 20px;
-      right: 20px;
+      top: 18px;
+      right: 18px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       z-index: 20;
       pointer-events: auto;
     }
 
     .zoom-btn {
-      width: 44px;
-      height: 44px;
+      width: 42px;
+      height: 42px;
       background: rgba(0, 0, 0, 0.65);
       color: white;
       border: 2px solid #666;
       border-radius: 50%;
-      font-size: 20px;
+      font-size: 18px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      backdrop-filter: blur(6px);
+      backdrop-filter: blur(5px);
       transition: all 0.2s;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
@@ -118,9 +149,11 @@
     }
 
     @media (max-width: 600px) {
-      h1 { font-size: 3.2rem; }
-      h2 { font-size: 1.1rem; }
-      .zoom-btn { width: 40px; height: 40px; font-size: 18px; }
+      h1 { font-size: 2.8rem; }
+      h2 { font-size: 1rem; margin-bottom: 0.8rem; }
+      .legend { font-size: 0.8rem; gap: 8px; }
+      .legend-color { width: 12px; height: 12px; }
+      .zoom-btn { width: 38px; height: 38px; font-size: 16px; }
     }
   </style>
 </head>
@@ -128,10 +161,19 @@
   <h1>Onyx Wolves</h1>
   <h2>Géocalisation</h2>
 
+  <div class="legend">
+    <div class="legend-item"><div class="legend-color red"></div> Drogue</div>
+    <div class="legend-item"><div class="legend-color green"></div> Crochetage</div>
+    <div class="legend-item"><div class="legend-color yellow"></div> Go-Fast</div>
+    <div class="legend-item"><div class="legend-color purple"></div> Donneur</div>
+    <div class="legend-item"><div class="legend-color blue"></div> Vendeur D'arme</div>
+    <div class="legend-item"><div class="legend-color white"></div> Développement de business (en dev)</div>
+  </div>
+
   <div class="image-container" id="container">
     <img
       src="https://i.ibb.co/7JBqGVM3/GTAV-HD-MAP-satellite.jpg"
-      alt="Carte complète"
+      alt="Carte interactive"
       class="zoomable-image"
       id="zoomable"
       draggable="false"
@@ -139,7 +181,7 @@
     <div class="zoom-controls">
       <button class="zoom-btn" id="zoomIn">+</button>
       <button class="zoom-btn" id="zoomOut">−</button>
-      <button class="zoom-btn" id="zoomReset" style="font-size:16px;">↺</button>
+      <button class="zoom-btn" id="zoomReset" style="font-size:14px;">↺</button>
     </div>
   </div>
 
@@ -154,10 +196,9 @@
     let posX = 0;
     let posY = 0;
     const minZoom = 0.1;
-    const maxZoom = 10;
-    const zoomStep = 0.2;
+    const maxZoom = 5; // ✅ Moins extrême
+    const zoomStep = 0.1; // ✅ Zoom plus fin
 
-    // Détecter mobile vs desktop
     const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     img.addEventListener('dragstart', e => e.preventDefault());
@@ -169,56 +210,44 @@
 
     function enforceBounds() {
       if (!img.naturalWidth) return;
-
       const cw = container.clientWidth;
       const ch = container.clientHeight;
       const iw = img.naturalWidth * zoom;
       const ih = img.naturalHeight * zoom;
-
       const maxX = Math.max(0, (iw - cw) / 2);
       const maxY = Math.max(0, (ih - ch) / 2);
-
       posX = Math.min(maxX, Math.max(-maxX, posX));
       posY = Math.min(maxY, Math.max(-maxY, posY));
-
       applyTransform();
     }
 
     function resetView() {
       const cw = container.clientWidth;
       const ch = container.clientHeight;
-
-      // Calcul du zoom nécessaire pour tout voir
       const scaleX = cw / img.naturalWidth;
       const scaleY = ch / img.naturalHeight;
       let initialZoom = Math.min(scaleX, scaleY);
-
-      // ✅ Ajustement : sur mobile, on autorise jusqu'à 1x si possible
       if (isMobile) {
-        initialZoom = Math.min(1, initialZoom * 1.2); // léger zoom pour éviter "trop petit"
+        initialZoom = Math.min(1, initialZoom * 1.15);
       } else {
-        initialZoom = Math.min(0.9, initialZoom); // sur PC, on reste prudent
+        initialZoom = Math.min(0.95, initialZoom);
       }
-
       zoom = Math.max(minZoom, initialZoom);
       posX = 0;
       posY = 0;
       enforceBounds();
     }
 
-    // ✅ Zoom TOUJOURS centré
+    // ✅ Zoom TOUJOURS vers le CENTRE DE LA VUE
     function applyZoom(delta) {
       const newZoom = Math.min(Math.max(minZoom, zoom + delta), maxZoom);
-      // Pas de référence au curseur → zoom centré
       const rect = container.getBoundingClientRect();
       const centerX = rect.width / 2;
       const centerY = rect.height / 2;
       const ratio = newZoom / zoom;
-
-      // Garde le centre fixe
+      // Correction centrée
       posX = centerX - (centerX - posX) * ratio;
       posY = centerY - (centerY - posY) * ratio;
-
       zoom = newZoom;
       enforceBounds();
     }
