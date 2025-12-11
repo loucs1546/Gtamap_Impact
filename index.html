@@ -70,8 +70,8 @@
     .zoomable-image {
       width: auto;
       height: auto;
-      max-width: 100%;
-      max-height: 100%;
+      max-width: none;
+      max-height: none;
       cursor: grab;
       transition: transform 0.1s ease-out;
       -webkit-user-drag: none;
@@ -150,13 +150,15 @@
     const zoomOutBtn = document.getElementById('zoomOut');
     const zoomResetBtn = document.getElementById('zoomReset');
 
-    // On commence à zoom = 1, mais on va ajuster la position pour centrer
     let zoom = 1;
     let posX = 0;
     let posY = 0;
-    const minZoom = 0.1; // ✅ Permet de voir TOUTE l'image, même si géante
+    const minZoom = 0.1;
     const maxZoom = 10;
     const zoomStep = 0.2;
+
+    // Détecter mobile vs desktop
+    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     img.addEventListener('dragstart', e => e.preventDefault());
     img.addEventListener('contextmenu', e => e.preventDefault());
@@ -183,13 +185,20 @@
     }
 
     function resetView() {
-      // ✅ Zoom initial : l'image entière est visible, centrée
       const cw = container.clientWidth;
       const ch = container.clientHeight;
 
+      // Calcul du zoom nécessaire pour tout voir
       const scaleX = cw / img.naturalWidth;
       const scaleY = ch / img.naturalHeight;
-      const initialZoom = Math.min(scaleX, scaleY, 1); // jamais > 1 au départ
+      let initialZoom = Math.min(scaleX, scaleY);
+
+      // ✅ Ajustement : sur mobile, on autorise jusqu'à 1x si possible
+      if (isMobile) {
+        initialZoom = Math.min(1, initialZoom * 1.2); // léger zoom pour éviter "trop petit"
+      } else {
+        initialZoom = Math.min(0.9, initialZoom); // sur PC, on reste prudent
+      }
 
       zoom = Math.max(minZoom, initialZoom);
       posX = 0;
@@ -197,14 +206,19 @@
       enforceBounds();
     }
 
+    // ✅ Zoom TOUJOURS centré
     function applyZoom(delta) {
       const newZoom = Math.min(Math.max(minZoom, zoom + delta), maxZoom);
+      // Pas de référence au curseur → zoom centré
       const rect = container.getBoundingClientRect();
-      const cx = rect.width / 2;
-      const cy = rect.height / 2;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
       const ratio = newZoom / zoom;
-      posX = cx - (cx - posX) * ratio;
-      posY = cy - (cy - posY) * ratio;
+
+      // Garde le centre fixe
+      posX = centerX - (centerX - posX) * ratio;
+      posY = centerY - (centerY - posY) * ratio;
+
       zoom = newZoom;
       enforceBounds();
     }
@@ -218,6 +232,7 @@
       applyZoom(e.deltaY > 0 ? -zoomStep : zoomStep);
     });
 
+    // Déplacement
     let isDragging = false;
     let startX, startY;
 
@@ -269,7 +284,6 @@
       isDragging = false;
     });
 
-    // ✅ Au chargement : affiche TOUTE l'image
     img.onload = resetView;
     window.addEventListener('resize', resetView);
   </script>
