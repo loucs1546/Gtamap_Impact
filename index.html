@@ -21,11 +21,11 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding-top: 2rem;
+      padding-top: 1.5rem;
     }
 
     h1 {
-      font-size: 5rem;
+      font-size: 4.5rem;
       font-weight: 900;
       letter-spacing: 4px;
       text-transform: uppercase;
@@ -35,7 +35,7 @@
       color: transparent;
       background-size: 300% 300%;
       animation: shine 6s infinite linear;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.4rem;
       text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
     }
 
@@ -46,19 +46,20 @@
     }
 
     h2 {
-      font-size: 1.5rem;
+      font-size: 1.4rem;
       font-weight: 300;
-      letter-spacing: 8px;
+      letter-spacing: 6px;
       color: #aaa;
-      margin-bottom: 2rem;
+      margin-bottom: 1.2rem;
     }
 
     .image-container {
-      width: 90vw;
-      height: 70vh;
+      width: 92vw;
+      height: 85vh; /* ✅ PLUS HAUT */
       overflow: hidden;
-      border-radius: 8px;
-      box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+      border-radius: 10px;
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.8);
+      -webkit-user-drag: none; /* Empêche le drag natif (Safari) */
     }
 
     .zoomable-image {
@@ -66,7 +67,11 @@
       height: 100%;
       object-fit: cover;
       cursor: grab;
-      transition: transform 0.1s ease-out;
+      transition: transform 0.05s ease-out;
+      -webkit-user-drag: none; /* Empêche le drag sur WebKit */
+      -webkit-touch-callout: none; /* Désactive l'appel contextuel */
+      user-select: none; /* Empêche la sélection */
+      pointer-events: auto;
     }
 
     .zoomable-image:active {
@@ -81,9 +86,10 @@
   <div class="image-container" id="container">
     <img
       src="https://i.ibb.co/7JBqGVM3/GTAV-HD-MAP-satellite.jpg"
-      alt="Onyx Wolves - High-res background"
+      alt="Carte haute résolution"
       class="zoomable-image"
       id="zoomable"
+      draggable="false" <!-- ✅ Désactive le drag natif -->
     />
   </div>
 
@@ -97,47 +103,79 @@
     const maxZoom = 5;
     const minZoom = 1;
 
+    // 🔒 Empêcher le menu contextuel et le drag natif
+    img.addEventListener('dragstart', (e) => e.preventDefault());
+    img.addEventListener('contextmenu', (e) => e.preventDefault());
+
     // Pan
-    container.addEventListener('mousedown', startDrag);
-    container.addEventListener('mouseleave', endDrag);
-    container.addEventListener('mouseup', endDrag);
-    container.addEventListener('mousemove', drag);
-
-    // Zoom
-    container.addEventListener('wheel', handleZoom);
-
     let isDragging = false;
-    let prevX, prevY;
+    let startX, startY;
 
-    function startDrag(e) {
+    container.addEventListener('mousedown', (e) => {
       isDragging = true;
-      prevX = e.clientX - pos.x;
-      prevY = e.clientY - pos.y;
+      startX = e.clientX - pos.x;
+      startY = e.clientY - pos.y;
       img.style.cursor = 'grabbing';
-    }
+      e.preventDefault(); // 🔒 Empêche la sélection/surlignage
+    });
 
-    function drag(e) {
+    container.addEventListener('mousemove', (e) => {
       if (!isDragging) return;
-      pos.x = e.clientX - prevX;
-      pos.y = e.clientY - prevY;
+      pos.x = e.clientX - startX;
+      pos.y = e.clientY - startY;
       applyTransform();
-    }
+    });
 
-    function endDrag() {
+    window.addEventListener('mouseup', () => {
       isDragging = false;
       img.style.cursor = 'grab';
-    }
+    });
 
-    function handleZoom(e) {
+    // Zoom
+    container.addEventListener('wheel', (e) => {
       e.preventDefault();
       const zoomDelta = e.deltaY > 0 ? -zoomFactor : zoomFactor;
-      zoom = Math.min(Math.max(minZoom, zoom + zoomDelta), maxZoom);
+      const newZoom = Math.min(Math.max(minZoom, zoom + zoomDelta), maxZoom);
+      // Zoom vers la position du curseur
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const zoomRatio = newZoom / zoom;
+
+      pos.x = mouseX - (mouseX - pos.x) * zoomRatio;
+      pos.y = mouseY - (mouseY - pos.y) * zoomRatio;
+
+      zoom = newZoom;
       applyTransform();
-    }
+    });
 
     function applyTransform() {
       img.style.transform = `translate(${pos.x}px, ${pos.y}px) scale(${zoom})`;
     }
+
+    // ✅ Pour les mobiles/tactiles (optionnel mais utile)
+    let touchStartX, touchStartY;
+    container.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        isDragging = true;
+        touchStartX = e.touches[0].clientX - pos.x;
+        touchStartY = e.touches[0].clientY - pos.y;
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (e) => {
+      if (isDragging && e.touches.length === 1) {
+        pos.x = e.touches[0].clientX - touchStartX;
+        pos.y = e.touches[0].clientY - touchStartY;
+        applyTransform();
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchend', () => {
+      isDragging = false;
+    });
   </script>
 </body>
 </html>
