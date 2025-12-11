@@ -66,9 +66,11 @@
     }
 
     .zoomable-image {
+      /* ✅ Ne PAS forcer width/height → conserve le ratio d'origine */
       max-width: none;
       max-height: none;
-      object-fit: contain;
+      width: auto;
+      height: auto;
       cursor: grab;
       transition: transform 0.1s ease-out;
       -webkit-user-drag: none;
@@ -119,7 +121,7 @@
   <div class="image-container" id="container">
     <img
       src="https://i.ibb.co/7JBqGVM3/GTAV-HD-MAP-satellite.jpg"
-      alt="Carte GTA complète"
+      alt="Carte GTA non étirée"
       class="zoomable-image"
       id="zoomable"
       draggable="false"
@@ -139,73 +141,86 @@
     const zoomResetBtn = document.getElementById('zoomReset');
 
     let zoom = 1;
+    let posX = 0;
+    let posY = 0;
     const minZoom = 1;
     const maxZoom = 10;
     const zoomStep = 0.3;
-
-    // Position centrée par défaut
-    let posX = 0;
-    let posY = 0;
 
     // Bloquer comportements indésirables
     img.addEventListener('dragstart', e => e.preventDefault());
     img.addEventListener('contextmenu', e => e.preventDefault());
 
-    // Recalculer les limites à chaque zoom ou redimensionnement
-    function updateTransform() {
+    function applyTransform() {
       img.style.transform = `translate(${posX}px, ${posY}px) scale(${zoom})`;
+    }
 
-      // ✅ Calculer les limites pour ne jamais montrer de vide
+    function enforceBounds() {
+      if (!img.complete) return;
+
       const containerRect = container.getBoundingClientRect();
-      const imgRect = img.getBoundingClientRect();
-
-      // Largeur/hauteur effective de l'image après zoom
-      const imgWidth = imgRect.width;
-      const imgHeight = imgRect.height;
       const containerWidth = containerRect.width;
       const containerHeight = containerRect.height;
 
-      // Marges max autorisées (centrées)
-      const maxX = Math.max(0, (imgWidth - containerWidth) / 2);
-      const maxY = Math.max(0, (imgHeight - containerHeight) / 2);
+      // Dimensions naturelles de l'image (non zoomée)
+      const naturalWidth = img.naturalWidth;
+      const naturalHeight = img.naturalHeight;
+
+      // Dimensions actuelles après zoom
+      const scaledWidth = naturalWidth * zoom;
+      const scaledHeight = naturalHeight * zoom;
+
+      // Calcul des marges max autorisées
+      const maxX = Math.max(0, (scaledWidth - containerWidth) / 2);
+      const maxY = Math.max(0, (scaledHeight - containerHeight) / 2);
 
       // Appliquer les limites
       posX = Math.min(maxX, Math.max(-maxX, posX));
       posY = Math.min(maxY, Math.max(-maxY, posY));
 
-      // Reappliquer avec limites
-      img.style.transform = `translate(${posX}px, ${posY}px) scale(${zoom})`;
+      applyTransform();
     }
 
-    // Zoom centré (simple et fluide)
+    function update() {
+      enforceBounds();
+    }
+
     function applyZoom(delta) {
       const newZoom = Math.min(Math.max(minZoom, zoom + delta), maxZoom);
+      // Zoom centré : réajuster la position pour garder le centre fixe
+      const rect = container.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      // Ajustement pour garder le point central fixe (optionnel, mais fluide)
+      const ratio = newZoom / zoom;
+      posX = centerX - (centerX - posX) * ratio;
+      posY = centerY - (centerY - posY) * ratio;
+
       zoom = newZoom;
-      updateTransform();
+      update();
     }
 
-    // Boutons
+    // Contrôles
     zoomInBtn.addEventListener('click', () => applyZoom(zoomStep));
     zoomOutBtn.addEventListener('click', () => applyZoom(-zoomStep));
     zoomResetBtn.addEventListener('click', () => {
       zoom = 1;
       posX = 0;
       posY = 0;
-      updateTransform();
+      update();
     });
 
-    // Molette → zoom centré
-    container.addEventListener('wheel', (e) => {
+    container.addEventListener('wheel', e => {
       e.preventDefault();
-      const delta = e.deltaY > 0 ? -zoomStep : zoomStep;
-      applyZoom(delta);
+      applyZoom(e.deltaY > 0 ? -zoomStep : zoomStep);
     });
 
-    // Déplacement avec limites
+    // Déplacement
     let isDragging = false;
     let startX, startY;
 
-    container.addEventListener('mousedown', (e) => {
+    container.addEventListener('mousedown', e => {
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;
@@ -213,15 +228,13 @@
       e.preventDefault();
     });
 
-    container.addEventListener('mousemove', (e) => {
+    container.addEventListener('mousemove', e => {
       if (!isDragging) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      posX += dx;
-      posY += dy;
+      posX += e.clientX - startX;
+      posY += e.clientY - startY;
       startX = e.clientX;
       startY = e.clientY;
-      updateTransform();
+      update();
     });
 
     window.addEventListener('mouseup', () => {
@@ -229,26 +242,23 @@
       img.style.cursor = 'grab';
     });
 
-    // Support tactile
-    let touchStartX, touchStartY;
-    container.addEventListener('touchstart', (e) => {
+    // Touch
+    container.addEventListener('touchstart', e => {
       if (e.touches.length === 1) {
         isDragging = true;
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
         e.preventDefault();
       }
     }, { passive: false });
 
-    container.addEventListener('touchmove', (e) => {
+    container.addEventListener('touchmove', e => {
       if (isDragging && e.touches.length === 1) {
-        const dx = e.touches[0].clientX - touchStartX;
-        const dy = e.touches[0].clientY - touchStartY;
-        posX += dx;
-        posY += dy;
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-        updateTransform();
+        posX += e.touches[0].clientX - startX;
+        posY += e.touches[0].clientY - startY;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        update();
         e.preventDefault();
       }
     }, { passive: false });
@@ -258,8 +268,10 @@
     });
 
     // Initialisation
-    img.onload = updateTransform;
-    window.addEventListener('resize', updateTransform);
+    img.onload = () => {
+      update();
+    };
+    window.addEventListener('resize', update);
   </script>
 </body>
 </html>
