@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
   <title>Onyx Wolves — Géocalisation</title>
   <style>
     * {
@@ -22,6 +22,7 @@
       align-items: center;
       justify-content: flex-start;
       padding-top: 2rem;
+      touch-action: none; /* Désactive le zoom navigateur */
     }
 
     h1 {
@@ -63,14 +64,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      touch-action: none;
     }
 
     .zoomable-image {
-      /* ✅ Ne PAS forcer width/height → conserve le ratio d'origine */
-      max-width: none;
-      max-height: none;
       width: auto;
       height: auto;
+      max-width: none;
+      max-height: none;
       cursor: grab;
       transition: transform 0.1s ease-out;
       -webkit-user-drag: none;
@@ -88,29 +89,39 @@
       right: 20px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      z-index: 10;
+      gap: 12px;
+      z-index: 20;
+      pointer-events: auto; /* ✅ Important pour mobile */
     }
 
     .zoom-btn {
-      width: 40px;
-      height: 40px;
-      background: rgba(0, 0, 0, 0.6);
+      width: 44px;
+      height: 44px;
+      background: rgba(0, 0, 0, 0.65);
       color: white;
-      border: 2px solid #555;
+      border: 2px solid #666;
       border-radius: 50%;
-      font-size: 18px;
+      font-size: 20px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      backdrop-filter: blur(4px);
+      backdrop-filter: blur(6px);
       transition: all 0.2s;
+      -webkit-tap-highlight-color: transparent; /* Supprime le flash sur iOS */
+      touch-action: manipulation; /* ✅ Empêche le double-tap zoom */
     }
 
     .zoom-btn:hover {
-      background: rgba(50, 50, 50, 0.8);
-      border-color: #aaa;
+      background: rgba(40, 40, 40, 0.85);
+      border-color: #bbb;
+    }
+
+    /* Pour les petits écrans */
+    @media (max-width: 600px) {
+      h1 { font-size: 3.2rem; }
+      h2 { font-size: 1.1rem; letter-spacing: 4px; margin-bottom: 1.2rem; }
+      .zoom-btn { width: 40px; height: 40px; font-size: 18px; }
     }
   </style>
 </head>
@@ -129,7 +140,7 @@
     <div class="zoom-controls">
       <button class="zoom-btn" id="zoomIn">+</button>
       <button class="zoom-btn" id="zoomOut">−</button>
-      <button class="zoom-btn" id="zoomReset" style="font-size:14px;">↺</button>
+      <button class="zoom-btn" id="zoomReset" style="font-size:16px;">↺</button>
     </div>
   </div>
 
@@ -147,7 +158,7 @@
     const maxZoom = 10;
     const zoomStep = 0.3;
 
-    // Bloquer comportements indésirables
+    // Bloquer le menu contextuel et le drag
     img.addEventListener('dragstart', e => e.preventDefault());
     img.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -156,71 +167,74 @@
     }
 
     function enforceBounds() {
-      if (!img.complete) return;
+      if (!img.naturalWidth || !img.naturalHeight) return;
 
       const containerRect = container.getBoundingClientRect();
-      const containerWidth = containerRect.width;
-      const containerHeight = containerRect.height;
+      const cw = containerRect.width;
+      const ch = containerRect.height;
 
-      // Dimensions naturelles de l'image (non zoomée)
-      const naturalWidth = img.naturalWidth;
-      const naturalHeight = img.naturalHeight;
+      const iw = img.naturalWidth * zoom;
+      const ih = img.naturalHeight * zoom;
 
-      // Dimensions actuelles après zoom
-      const scaledWidth = naturalWidth * zoom;
-      const scaledHeight = naturalHeight * zoom;
+      const maxX = Math.max(0, (iw - cw) / 2);
+      const maxY = Math.max(0, (ih - ch) / 2);
 
-      // Calcul des marges max autorisées
-      const maxX = Math.max(0, (scaledWidth - containerWidth) / 2);
-      const maxY = Math.max(0, (scaledHeight - containerHeight) / 2);
-
-      // Appliquer les limites
       posX = Math.min(maxX, Math.max(-maxX, posX));
       posY = Math.min(maxY, Math.max(-maxY, posY));
 
       applyTransform();
     }
 
-    function update() {
+    function fitToContainer() {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const availableWidth = containerRect.width;
+      const availableHeight = containerRect.height;
+
+      const ratio = Math.min(
+        availableWidth / img.naturalWidth,
+        availableHeight / img.naturalHeight
+      );
+
+      // Appliquer le zoom max possible sans dépasser
+      zoom = Math.min(maxZoom, Math.max(minZoom, ratio));
+      posX = 0;
+      posY = 0;
       enforceBounds();
     }
 
     function applyZoom(delta) {
       const newZoom = Math.min(Math.max(minZoom, zoom + delta), maxZoom);
-      // Zoom centré : réajuster la position pour garder le centre fixe
       const rect = container.getBoundingClientRect();
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-
-      // Ajustement pour garder le point central fixe (optionnel, mais fluide)
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
       const ratio = newZoom / zoom;
-      posX = centerX - (centerX - posX) * ratio;
-      posY = centerY - (centerY - posY) * ratio;
-
+      posX = cx - (cx - posX) * ratio;
+      posY = cy - (cy - posY) * ratio;
       zoom = newZoom;
-      update();
+      enforceBounds();
     }
 
-    // Contrôles
+    // Écouteurs boutons
     zoomInBtn.addEventListener('click', () => applyZoom(zoomStep));
     zoomOutBtn.addEventListener('click', () => applyZoom(-zoomStep));
     zoomResetBtn.addEventListener('click', () => {
-      zoom = 1;
-      posX = 0;
-      posY = 0;
-      update();
+      fitToContainer(); // ✅ Réinitialise avec "dézoom à fond"
     });
 
+    // Molette
     container.addEventListener('wheel', e => {
       e.preventDefault();
       applyZoom(e.deltaY > 0 ? -zoomStep : zoomStep);
     });
 
-    // Déplacement
+    // Déplacement souris
     let isDragging = false;
     let startX, startY;
 
     container.addEventListener('mousedown', e => {
+      if (e.target.closest('.zoom-btn')) return; // ✅ Ignore les clics sur les boutons
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;
@@ -234,7 +248,7 @@
       posY += e.clientY - startY;
       startX = e.clientX;
       startY = e.clientY;
-      update();
+      enforceBounds();
     });
 
     window.addEventListener('mouseup', () => {
@@ -242,8 +256,9 @@
       img.style.cursor = 'grab';
     });
 
-    // Touch
+    // Touch (mobile)
     container.addEventListener('touchstart', e => {
+      if (e.target.closest('.zoom-btn')) return; // ✅ Priorité aux boutons
       if (e.touches.length === 1) {
         isDragging = true;
         startX = e.touches[0].clientX;
@@ -253,25 +268,27 @@
     }, { passive: false });
 
     container.addEventListener('touchmove', e => {
-      if (isDragging && e.touches.length === 1) {
-        posX += e.touches[0].clientX - startX;
-        posY += e.touches[0].clientY - startY;
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        update();
-        e.preventDefault();
-      }
+      if (!isDragging || e.touches.length !== 1) return;
+      posX += e.touches[0].clientX - startX;
+      posY += e.touches[0].clientY - startY;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      enforceBounds();
+      e.preventDefault();
     }, { passive: false });
 
     container.addEventListener('touchend', () => {
       isDragging = false;
     });
 
-    // Initialisation
+    // Chargement initial
     img.onload = () => {
-      update();
+      fitToContainer(); // ✅ Image "dézoomée à fond" = zoom max naturel
     };
-    window.addEventListener('resize', update);
+
+    window.addEventListener('resize', () => {
+      fitToContainer();
+    });
   </script>
 </body>
 </html>
