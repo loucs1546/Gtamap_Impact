@@ -22,7 +22,7 @@
       align-items: center;
       justify-content: flex-start;
       padding-top: 2rem;
-      touch-action: none; /* Désactive le zoom navigateur */
+      touch-action: none;
     }
 
     h1 {
@@ -70,8 +70,8 @@
     .zoomable-image {
       width: auto;
       height: auto;
-      max-width: none;
-      max-height: none;
+      max-width: 100%;
+      max-height: 100%;
       cursor: grab;
       transition: transform 0.1s ease-out;
       -webkit-user-drag: none;
@@ -91,7 +91,7 @@
       flex-direction: column;
       gap: 12px;
       z-index: 20;
-      pointer-events: auto; /* ✅ Important pour mobile */
+      pointer-events: auto;
     }
 
     .zoom-btn {
@@ -108,8 +108,8 @@
       justify-content: center;
       backdrop-filter: blur(6px);
       transition: all 0.2s;
-      -webkit-tap-highlight-color: transparent; /* Supprime le flash sur iOS */
-      touch-action: manipulation; /* ✅ Empêche le double-tap zoom */
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     .zoom-btn:hover {
@@ -117,10 +117,9 @@
       border-color: #bbb;
     }
 
-    /* Pour les petits écrans */
     @media (max-width: 600px) {
       h1 { font-size: 3.2rem; }
-      h2 { font-size: 1.1rem; letter-spacing: 4px; margin-bottom: 1.2rem; }
+      h2 { font-size: 1.1rem; }
       .zoom-btn { width: 40px; height: 40px; font-size: 18px; }
     }
   </style>
@@ -132,7 +131,7 @@
   <div class="image-container" id="container">
     <img
       src="https://i.ibb.co/7JBqGVM3/GTAV-HD-MAP-satellite.jpg"
-      alt="Carte GTA non étirée"
+      alt="Carte complète"
       class="zoomable-image"
       id="zoomable"
       draggable="false"
@@ -151,14 +150,14 @@
     const zoomOutBtn = document.getElementById('zoomOut');
     const zoomResetBtn = document.getElementById('zoomReset');
 
+    // On commence à zoom = 1, mais on va ajuster la position pour centrer
     let zoom = 1;
     let posX = 0;
     let posY = 0;
-    const minZoom = 1;
+    const minZoom = 0.1; // ✅ Permet de voir TOUTE l'image, même si géante
     const maxZoom = 10;
-    const zoomStep = 0.3;
+    const zoomStep = 0.2;
 
-    // Bloquer le menu contextuel et le drag
     img.addEventListener('dragstart', e => e.preventDefault());
     img.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -167,12 +166,10 @@
     }
 
     function enforceBounds() {
-      if (!img.naturalWidth || !img.naturalHeight) return;
+      if (!img.naturalWidth) return;
 
-      const containerRect = container.getBoundingClientRect();
-      const cw = containerRect.width;
-      const ch = containerRect.height;
-
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
       const iw = img.naturalWidth * zoom;
       const ih = img.naturalHeight * zoom;
 
@@ -185,20 +182,16 @@
       applyTransform();
     }
 
-    function fitToContainer() {
-      if (!img.naturalWidth || !img.naturalHeight) return;
+    function resetView() {
+      // ✅ Zoom initial : l'image entière est visible, centrée
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
 
-      const containerRect = container.getBoundingClientRect();
-      const availableWidth = containerRect.width;
-      const availableHeight = containerRect.height;
+      const scaleX = cw / img.naturalWidth;
+      const scaleY = ch / img.naturalHeight;
+      const initialZoom = Math.min(scaleX, scaleY, 1); // jamais > 1 au départ
 
-      const ratio = Math.min(
-        availableWidth / img.naturalWidth,
-        availableHeight / img.naturalHeight
-      );
-
-      // Appliquer le zoom max possible sans dépasser
-      zoom = Math.min(maxZoom, Math.max(minZoom, ratio));
+      zoom = Math.max(minZoom, initialZoom);
       posX = 0;
       posY = 0;
       enforceBounds();
@@ -216,25 +209,20 @@
       enforceBounds();
     }
 
-    // Écouteurs boutons
     zoomInBtn.addEventListener('click', () => applyZoom(zoomStep));
     zoomOutBtn.addEventListener('click', () => applyZoom(-zoomStep));
-    zoomResetBtn.addEventListener('click', () => {
-      fitToContainer(); // ✅ Réinitialise avec "dézoom à fond"
-    });
+    zoomResetBtn.addEventListener('click', resetView);
 
-    // Molette
     container.addEventListener('wheel', e => {
       e.preventDefault();
       applyZoom(e.deltaY > 0 ? -zoomStep : zoomStep);
     });
 
-    // Déplacement souris
     let isDragging = false;
     let startX, startY;
 
     container.addEventListener('mousedown', e => {
-      if (e.target.closest('.zoom-btn')) return; // ✅ Ignore les clics sur les boutons
+      if (e.target.closest('.zoom-btn')) return;
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;
@@ -256,9 +244,9 @@
       img.style.cursor = 'grab';
     });
 
-    // Touch (mobile)
+    // Mobile
     container.addEventListener('touchstart', e => {
-      if (e.target.closest('.zoom-btn')) return; // ✅ Priorité aux boutons
+      if (e.target.closest('.zoom-btn')) return;
       if (e.touches.length === 1) {
         isDragging = true;
         startX = e.touches[0].clientX;
@@ -281,14 +269,9 @@
       isDragging = false;
     });
 
-    // Chargement initial
-    img.onload = () => {
-      fitToContainer(); // ✅ Image "dézoomée à fond" = zoom max naturel
-    };
-
-    window.addEventListener('resize', () => {
-      fitToContainer();
-    });
+    // ✅ Au chargement : affiche TOUTE l'image
+    img.onload = resetView;
+    window.addEventListener('resize', resetView);
   </script>
 </body>
 </html>
