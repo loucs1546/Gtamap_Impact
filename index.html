@@ -87,7 +87,7 @@
 
     .image-container {
       width: 90vw;
-      height: 65vh; /* un peu plus compact pour la légende */
+      height: 65vh;
       overflow: hidden;
       border-radius: 8px;
       box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
@@ -196,8 +196,8 @@
     let posX = 0;
     let posY = 0;
     const minZoom = 0.1;
-    const maxZoom = 5; // ✅ Moins extrême
-    const zoomStep = 0.1; // ✅ Zoom plus fin
+    const maxZoom = 5;
+    const zoomStep = 0.1; // pour les boutons
 
     const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
@@ -238,28 +238,61 @@
       enforceBounds();
     }
 
-    // ✅ Zoom TOUJOURS vers le CENTRE DE LA VUE
-    function applyZoom(delta) {
+    // ✅ Zoom vers le curseur (molette uniquement)
+    function zoomAtCursor(containerX, containerY, delta) {
       const newZoom = Math.min(Math.max(minZoom, zoom + delta), maxZoom);
-      const rect = container.getBoundingClientRect();
-      const centerX = rect.width / 2;
-      const centerY = rect.height / 2;
-      const ratio = newZoom / zoom;
-      // Correction centrée
-      posX = centerX - (centerX - posX) * ratio;
-      posY = centerY - (centerY - posY) * ratio;
+      const zoomFactor = newZoom / zoom;
+
+      // Le point sous le curseur doit rester fixe
+      const mouseX = containerX;
+      const mouseY = containerY;
+
+      const dx = mouseX - posX;
+      const dy = mouseY - posY;
+
+      const newDx = dx * zoomFactor;
+      const newDy = dy * zoomFactor;
+
+      posX = mouseX - newDx;
+      posY = mouseY - newDy;
+
       zoom = newZoom;
       enforceBounds();
     }
 
-    zoomInBtn.addEventListener('click', () => applyZoom(zoomStep));
-    zoomOutBtn.addEventListener('click', () => applyZoom(-zoomStep));
-    zoomResetBtn.addEventListener('click', resetView);
-
+    // ✅ Molette : zoom doux + vers le curseur
     container.addEventListener('wheel', e => {
       e.preventDefault();
-      applyZoom(e.deltaY > 0 ? -zoomStep : zoomStep);
+      // Normaliser la sensibilité
+      let delta = -e.deltaY * 0.001; // ✅ Très doux
+      // Sur certains navigateurs (Firefox), deltaY est grand → on atténue
+      if (Math.abs(e.deltaY) > 100) {
+        delta = -e.deltaY * 0.0003; // encore plus doux
+      }
+
+      const rect = container.getBoundingClientRect();
+      const containerX = e.clientX - rect.left;
+      const containerY = e.clientY - rect.top;
+
+      zoomAtCursor(containerX, containerY, delta);
     });
+
+    // Boutons : zoom centré (optionnel mais clair)
+    zoomInBtn.addEventListener('click', () => {
+      const rect = container.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      zoomAtCursor(centerX, centerY, zoomStep);
+    });
+
+    zoomOutBtn.addEventListener('click', () => {
+      const rect = container.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      zoomAtCursor(centerX, centerY, -zoomStep);
+    });
+
+    zoomResetBtn.addEventListener('click', resetView);
 
     // Déplacement
     let isDragging = false;
@@ -288,7 +321,7 @@
       img.style.cursor = 'grab';
     });
 
-    // Mobile
+    // Mobile (pas de molette, donc pas de zoom tactile ici — optionnel à ajouter plus tard)
     container.addEventListener('touchstart', e => {
       if (e.target.closest('.zoom-btn')) return;
       if (e.touches.length === 1) {
